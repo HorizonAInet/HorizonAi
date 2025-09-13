@@ -1,0 +1,308 @@
+name: HorizonAi CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Frontend Testing
+  frontend-test:
+    runs-on: ubuntu-latest
+    name: Frontend Tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Install frontend dependencies
+      working-directory: frontend
+      run: npm ci
+      
+    - name: Run frontend linting
+      working-directory: frontend
+      run: npm run lint
+      
+    - name: Run frontend unit tests
+      working-directory: frontend
+      run: npm test -- --coverage --watchAll=false
+      
+    - name: Build frontend
+      working-directory: frontend
+      run: npm run build
+      
+    - name: Upload frontend test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  # Backend Testing
+  backend-test:
+    runs-on: ubuntu-latest
+    name: Backend Tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install backend dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio
+        
+    - name: Run backend linting
+      run: |
+        pip install flake8 black isort
+        flake8 backend/ --max-line-length=88 --extend-ignore=E203,W503
+        black --check backend/
+        isort --check-only backend/
+        
+    - name: Run backend unit tests
+      run: |
+        pytest backend/ --cov=backend --cov-report=xml --cov-report=html
+        coverage xml -o backend-coverage.xml
+        
+    - name: Upload backend test coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: backend-coverage.xml
+        flags: backend
+        name: backend-coverage
+
+  # Integration Testing
+  integration-test:
+    runs-on: ubuntu-latest
+    name: Integration Tests
+    needs: [frontend-test, backend-test]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        # Frontend
+        cd frontend && npm ci
+        # Backend
+        cd ..
+        pip install -r requirements.txt
+        pip install pytest-playwright
+        
+    - name: Setup Playwright
+      run: npx playwright install --with-deps
+      
+    - name: Run integration tests
+      run: |
+        # Start backend server
+        cd backend && python -m uvicorn backend_api:app --host 0.0.0.0 --port 8000 &
+        BACKEND_PID=$!
+        
+        # Wait for backend to start
+        sleep 10
+        
+        # Start frontend server
+        cd ../frontend && npm start &
+        FRONTEND_PID=$!
+        
+        # Wait for frontend to start
+        sleep 30
+        
+        # Run Playwright tests
+        npx playwright test
+        
+        # Cleanup
+        kill $BACKEND_PID $FRONTEND_PID
+
+  # Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Bandit security scan
+      uses: python-security/bandit@main
+      with:
+        args: -r backend/ -f json -o bandit-report.json
+        
+    - name: Run npm audit
+      working-directory: frontend
+      run: npm audit --audit-level=moderate
+      
+    - name: Run Snyk security scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+      working-directory: frontend
+
+  # Performance Testing
+  performance-test:
+    runs-on: ubuntu-latest
+    name: Performance Tests
+    needs: [frontend-test, backend-test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install locust
+        cd frontend && npm ci
+        
+    - name: Run load tests
+      run: |
+        # Start backend server
+        cd backend && python -m uvicorn backend_api:app --host 0.0.0.0 --port 8000 &
+        BACKEND_PID=$!
+        
+        # Wait for backend to start
+        sleep 10
+        
+        # Run Locust load tests
+        locust -f tests/locustfile.py --headless --users 10 --spawn-rate 2 --run-time 60s
+        
+        # Cleanup
+        kill $BACKEND_PID
+
+  # Build and Deploy
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy
+    needs: [frontend-test, backend-test, integration-test, security-scan, performance-test]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        
+    - name: Build and push Docker images
+      run: |
+        # Build frontend image
+        docker build -t horizonai-frontend:${{ github.sha }} -f frontend/Dockerfile frontend/
+        docker tag horizonai-frontend:${{ github.sha }} horizonai-frontend:latest
+        
+        # Build backend image
+        docker build -t horizonai-backend:${{ github.sha }} -f backend/Dockerfile .
+        docker tag horizonai-backend:${{ github.sha }} horizonai-backend:latest
+        
+        # Push images
+        docker push horizonai-frontend:${{ github.sha }}
+        docker push horizonai-frontend:latest
+        docker push horizonai-backend:${{ github.sha }}
+        docker push horizonai-backend:latest
+        
+    - name: Deploy to production
+      run: |
+        # Add your deployment commands here
+        # Example: kubectl apply -f k8s/
+        echo "Deploying to production..."
+
+  # Quality Gates
+  quality-gates:
+    runs-on: ubuntu-latest
+    name: Quality Gates
+    needs: [frontend-test, backend-test, security-scan]
+    
+    steps:
+    - name: Check test coverage
+      run: |
+        # Check if coverage meets minimum thresholds
+        if [ "${{ needs.frontend-test.outputs.coverage }}" -lt 80 ]; then
+          echo "Frontend coverage below 80%"
+          exit 1
+        fi
+        
+        if [ "${{ needs.backend-test.outputs.coverage }}" -lt 80 ]; then
+          echo "Backend coverage below 80%"
+          exit 1
+        fi
+        
+    - name: Check security scan results
+      run: |
+        # Check if security scan passed
+        if [ "${{ needs.security-scan.result }}" != "success" ]; then
+          echo "Security scan failed"
+          exit 1
+        fi
+        
+    - name: Quality gates passed
+      run: echo "All quality gates passed! 🎉"
