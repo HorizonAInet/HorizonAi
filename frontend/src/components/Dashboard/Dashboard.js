@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import Sidebar from "./Sidebar";
 import MainContent from "./MainContent";
@@ -15,15 +15,11 @@ const Dashboard = () => {
   const [queryHistory, setQueryHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAPIKeyCheck, setShowAPIKeyCheck] = useState(true);
-  const [hasAPIKey, setHasAPIKey] = useState(false);
+  // Removed unused hasAPIKey state to satisfy ESLint
 
   const [activeView, setActiveView] = useState("upload");
 
-  useEffect(() => {
-    loadUserData();
-  }, [user]);
-
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     try {
       if (user?.id) {
         const filesResponse = await fileAPI.getUserFiles(user.id);
@@ -39,7 +35,11 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
 
   const handleFileUpload = (file, metadata, preview) => {
     setCurrentFile({ file, metadata, preview });
@@ -72,7 +72,6 @@ const Dashboard = () => {
 
   const handleAPIKeyVerified = () => {
     setShowAPIKeyCheck(false);
-    setHasAPIKey(true);
     setActiveView("upload");
   };
 

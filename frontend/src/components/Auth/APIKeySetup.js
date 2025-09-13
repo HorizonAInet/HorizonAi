@@ -236,7 +236,7 @@
 
 // export default APIKeySetup;
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { toast } from "react-hot-toast";
 
@@ -246,12 +246,11 @@ const APIKeySetup = ({ onAPIKeySet }) => {
   const [isChecking, setIsChecking] = useState(true);
   const { user, session } = useAuth();
 
-  useEffect(() => {
-    checkExistingAPIKey();
-  }, [user, session]);
-
-  const checkExistingAPIKey = async () => {
-    if (!user || !session) return;
+  const checkExistingAPIKey = useCallback(async () => {
+    if (!user || !session) {
+      setIsChecking(false);
+      return;
+    }
 
     try {
       const token = session.access_token;
@@ -272,7 +271,11 @@ const APIKeySetup = ({ onAPIKeySet }) => {
     } finally {
       setIsChecking(false);
     }
-  };
+  }, [user, session, onAPIKeySet]);
+
+  useEffect(() => {
+    checkExistingAPIKey();
+  }, [checkExistingAPIKey]);
 
   // useEffect(() => {
   //   checkExistingAPIKey();

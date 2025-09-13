@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Eye, EyeOff, Key, Save, Trash2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -13,12 +13,7 @@ const APIKeySettings = () => {
 
   console.log('APIKeySettings rendered - apiKey:', apiKey, 'hasApiKey:', hasApiKey)
 
-  useEffect(() => {
-    // Load API key info - with user authentication if available
-    loadAPIKeyInfo()
-  }, [user, session]) // Re-run when user or session changes
-
-  const loadAPIKeyInfo = async () => {
+  const loadAPIKeyInfo = useCallback(async () => {
     if (!user || !session) return;
     
     try {
@@ -52,7 +47,12 @@ const APIKeySettings = () => {
     } catch (error) {
       console.error('Error loading API key info:', error)
     }
-  }
+  }, [session, user])
+
+  useEffect(() => {
+    // Load API key info - with user authentication if available
+    loadAPIKeyInfo()
+  }, [loadAPIKeyInfo]) // Re-run when user or session changes
 
   const handleSaveApiKey = async () => {
     if (!apiKey.trim()) {

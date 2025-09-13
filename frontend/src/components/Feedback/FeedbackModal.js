@@ -181,7 +181,7 @@
 
 // export default FeedbackModal
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { X, MessageSquare } from "lucide-react";
 import { feedbackAPI } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
@@ -199,13 +199,7 @@ const FeedbackModal = ({ isOpen, onClose, onSubmit }) => {
   const [existingFeedback, setExistingFeedback] = useState(null);
 
   // Load existing feedback when modal opens
-  useEffect(() => {
-    if (isOpen && user?.id) {
-      loadExistingFeedback();
-    }
-  }, [isOpen, user?.id]);
-
-  const loadExistingFeedback = async () => {
+  const loadExistingFeedback = useCallback(async () => {
     try {
       const response = await feedbackAPI.getUserFeedback(user.id);
       if (response.feedback) {
@@ -220,7 +214,13 @@ const FeedbackModal = ({ isOpen, onClose, onSubmit }) => {
     } catch (error) {
       console.error("Failed to load existing feedback:", error);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      loadExistingFeedback();
+    }
+  }, [isOpen, user?.id, loadExistingFeedback]);
 
   const handleRatingClick = (field, rating) => {
     setFormData((prev) => ({ ...prev, [field]: rating }));
