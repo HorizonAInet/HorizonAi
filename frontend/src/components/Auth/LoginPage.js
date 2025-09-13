@@ -303,7 +303,7 @@ const LoginPage = () => {
           <h2 id="horizon" className="text-2xl text-white flex items-center">
             <span>
               <img
-                src="images\logoyashraj1white.svg"
+                src="/images/logoyashraj1white.svg"
                 alt="Logo"
                 className="w-16 h-10 object-cover"
               />
