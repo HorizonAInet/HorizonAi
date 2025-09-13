@@ -279,7 +279,7 @@ Query: "Show me the top 5 customers by revenue"
 Result: Instantly generated table with highest-value customers
 ```
 
-## 📋 **How NL2PD Works: Step-by-Step Process**
+## 📋 **How HorizonAI Works: Step-by-Step Process**
 
 ### **1. Data Upload & Analysis**
 - **File Detection**: Automatically identifies CSV, Excel (XLSX/XLS), and JSON formats
@@ -315,6 +315,7 @@ Result: Instantly generated table with highest-value customers
 - **Query History**: Persists all interactions for future reference
 - **Export Options**: Allows downloading results in multiple formats
 - **Learning Integration**: Uses successful queries to improve future accuracy
+
 
 ### **User Workflow Example:**
 
@@ -547,7 +548,7 @@ df['Features'].str.contains('Wi-Fi|Bluetooth', regex=True)
 df.loc[df['Feature'] == 'Monthly Fee', 'Account_Premium'].iloc[0]
 ```
 
-## 🎯 **NL2PD vs Traditional Data Analysis Solutions**
+## 🎯 **HorizonAI vs Traditional Data Analysis Solutions**
 
 | **Capability** | **Traditional BI Tools** | **Manual Coding** | **HorizonAi Platform** |
 |----------------|-------------------------|-------------------|-------------------|
@@ -877,7 +878,7 @@ df.loc[df['Feature'] == 'Monthly Fee', 'Account_Premium'].iloc[0]
 
 ### **🔧 Developer & Integration Features (2026)**
 - **REST API & SDK**: Programmatic access for developers
-  - Complete API for embedding NL2PD in existing applications
+  - Complete API for embedding HorizonAI in existing applications
   - Python, JavaScript, and .NET SDKs for easy integration
   - Webhook support for real-time data processing notifications
   - GraphQL interface for flexible data querying
@@ -901,7 +902,7 @@ df.loc[df['Feature'] == 'Monthly Fee', 'Account_Premium'].iloc[0]
   - Advanced caching strategies with intelligent cache invalidation
   - Real-time streaming data analysis capabilities
 
-## 🎉 **Why Choose NL2PD?**
+## 🎉 **Why Choose HorizonAI?**
 
 ### **🚀 Revolutionary Business Impact**
 HorizonAi represents a paradigm shift in data analytics accessibility. Our platform successfully demonstrates the complete transformation from hardcoded limitations to intelligent automation, making advanced data analysis available to every business user regardless of technical expertise.
